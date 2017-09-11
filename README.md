@@ -6,7 +6,7 @@ credit card charges.
 ## Problem
 
 Amazon's charges on my credit card do not always match my order
-totals, nor do they match individual my line items. Instead, the
+totals, nor do they match my individual line items. Instead, the
 credit card charges show up based on some
 [partition](https://en.wikipedia.org/wiki/Partition_of_a_set) of the
 order items, where each charge is the sum of one of the partition
