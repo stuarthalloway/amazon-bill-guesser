@@ -45,7 +45,7 @@ Start a REPL from the repo directory:
 
 Then start the guesser and follow the prompts:
 
-    (require 'com.stuarthalloway.amazon-bill-guesser :as abg)
+    (require '[com.stuarthalloway.amazon-bill-guesser :as abg])
     (abg/guesser "your-csv-file-name")
 
 ## Other Approaches and Open Questions
