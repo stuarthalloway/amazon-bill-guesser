@@ -66,11 +66,11 @@ keyword          renaming
 
 (defn bin-by
   "Given a collection of entity maps, return a map from
-keyfn of entity to a set of entities matching that keyfn."
+keyfn of entity to a vector of entities matching that keyfn."
   [entities keyfn]
   (reduce
    (fn [m ent]
-     (update m (keyfn ent) (fnil conj #{}) ent))
+     (update m (keyfn ent) (fnil conj []) ent))
    {}
    entities))
 
@@ -87,7 +87,6 @@ keyfn of entity to a set of entities matching that keyfn."
   [amount orders-map limit]
   (eduction
    (comp
-    (map seq)
     (map combo/subsets)
     cat
     (take limit)
