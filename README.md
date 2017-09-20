@@ -24,7 +24,7 @@ If you have hundreds of orders to reconcile, this quickly becomes tedious.
 ## Approach
 
 The amazon-bill-guesser namespace provides functions that can slurp in
-Amazon's "Orders and Shipments" CSV file, and then create a map from
+Amazon's "Items" CSV file, and then create a map from
 every possible charge that might appear on your credit card to one or
 more plausible explanations of where that charge came from. You can
 type in a charge amount at the REPL, and see the explanations.
@@ -34,7 +34,7 @@ type in a charge amount at the REPL, and see the explanations.
 First [install Clojure](https://clojure.org/guides/clj) and clone this
 repo.
 
-Download a report of type "Orders and shipments" from
+Download a report of type "Items" from
 https://amazon.com, navigating via:
 
     Account & Lists -> Your Account -> Download order reports

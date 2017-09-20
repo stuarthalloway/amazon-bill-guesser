@@ -13,7 +13,8 @@
    [clojure.edn :as edn]
    [clojure.java.io :as io]
    [clojure.math.combinatorics :as combo]
-   [clojure.pprint :as pp]))
+   [clojure.pprint :as pp]
+   [com.stuarthalloway.amazon-bill-guesser.specs :as specs]))
 
 (defn csv-usd->bigdec
   "Convert a string USD rep into a bigdec, or throw"
@@ -30,27 +31,11 @@ keyword          renaming
 [kw f]           rename and translate"
   {"Order Date", :order-date
    "Order ID", :order-id
-   "Payment Instrument Type", nil
-   "Website", nil
-   "Purchase Order Number", nil
    "Ordering Customer Email", :email
    "Shipment Date", :ship-date,
    "Shipping Address Name", :ship-name
-   "Shipping Address Street 1", nil
-   "Shipping Address Street 2", nil
    "Shipping Address City", :ship-city
-   "Shipping Address State", nil
-   "Shipping Address Zip", nil
-   "Order Status", nil
-   "Carrier Name & Tracking Number", nil
-   "Subtotal", nil
-   "Shipping Charge", nil
-   "Tax Before Promotions", nil
-   "Total Promotions", nil
-   "Tax Charged", nil
-   "Total Charged", [:total csv-usd->bigdec]
-   "Buyer Name", nil
-   "Group Name", nil})
+   "Item Total", [:total csv-usd->bigdec]})
 
 (defn translate
   "Apply translation table to a map from strings to values."
@@ -66,15 +51,17 @@ keyword          renaming
    {}
    m))
   
-(defn load-orders-and-shipments
-  "Load an orders-and-shipments report from amazon.com"
+(defn load-items
+  "Load an items report from amazon.com"
   [csv-file]
   (with-open [rdr (io/reader csv-file)]
     (let [[hdr & data] (csv/read-csv rdr)]
       (into
        []
        (comp (map #(zipmap hdr %))
-             (map translate))
+             (map (fn [raw] [raw (translate raw)]))
+             (map (fn [[raw line-item]]
+                    (specs/conform! ::specs/line-item line-item raw))))
        data))))
 
 (defn bin-by
@@ -87,10 +74,18 @@ keyfn of entity to a set of entities matching that keyfn."
    {}
    entities))
 
+(def LIMIT 22)
+
 (def line-item-subsets
   "xform from an order into all its nontrivial subsets"
   (comp
    (map seq)
+   (map (fn [items]
+          (if (<= (count items) LIMIT)
+            items
+            (do
+              (println "...Truncating large order with" (count items) "items")
+              (take LIMIT items)))))
    (map combo/subsets)
    cat
    (filter seq)))
@@ -112,7 +107,7 @@ that tally to that dollar amount."
 
 (defn print-guess
   [n guess]
-  (println "Option " n ": " (:order-id (first guess)))
+  (println "Option" n ":" (:order-id (first guess)) (:order-date (first guess)))
   (pp/print-table table-keys guess)
   (println))
 
@@ -128,13 +123,15 @@ that tally to that dollar amount."
 
 (defn guesser
   "Launch a REPL UI that lets you enter dollar amounts, guessing
-how the Amazon orders-and-shipments report in csv-file might
+how the Amazon items report in csv-file might
 account for those dollar amounts."
   [csv-file]
-  (let [rows (load-orders-and-shipments csv-file)
+  (let [rows (load-items csv-file)
+        _ (prn "Item Count: " (count rows))
         orders (bin-by rows :order-id)
+        _ (prn "Order Count: " (count orders))
         pbm (possible-bill-amounts orders)]
-    (println csv-file "contains" (count orders) "orders , which could show up as" (count pbm) "distinct dollar amounts on a credit card statement.")
+    (println "For" csv-file "I am considering" (count pbm) "distinct dollar amounts that might show up on a credit card statement.")
     (loop []
       (println "Enter a USD amount in format n.nn to guess, or :exit to exit")
       (let [step (edn/read *in*)]

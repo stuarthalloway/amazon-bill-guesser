@@ -5,5 +5,6 @@
  '[clojure.math.combinatorics :as combo]
  '[clojure.pprint :as pp]
  '[clojure.set :as set]
+ '[clojure.spec.alpha :as s]
  '[com.stuarthalloway.amazon-bill-guesser :as abg])
 (set! *print-length* 25)
