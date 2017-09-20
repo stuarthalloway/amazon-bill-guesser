@@ -74,52 +74,48 @@ keyfn of entity to a set of entities matching that keyfn."
    {}
    entities))
 
-(def LIMIT 22)
+(defn progress
+  [ch n]
+  (let [a (atom 0)]
+    (map (fn [x]
+           (when (zero? (mod (swap! a inc) n))
+             (print ch)
+             (flush))
+           x))))
 
-(def line-item-subsets
-  "xform from an order into all its nontrivial subsets"
-  (comp
-   (map seq)
-   (map (fn [items]
-          (if (<= (count items) LIMIT)
-            items
-            (do
-              (println "...Truncating large order with" (count items) "items")
-              (take LIMIT items)))))
-   (map combo/subsets)
-   cat
-   (filter seq)))
-
-(defn possible-bill-amounts
-  "Returns a map from dollar amounts to a set of different explanations
-that tally to that dollar amount."
-  [orders]
-  (transduce
-   line-item-subsets
-   (completing
-    (fn [m line-items]
-      (let [k (apply + (map :total line-items))]
-        (update m k (fnil conj #{}) line-items))))
-   {}
-   (vals orders)))
+(defn possible-shipments
+  [amount orders-map limit]
+  (eduction
+   (comp
+    (map seq)
+    (map combo/subsets)
+    cat
+    (take limit)
+    (filter #(= amount (apply + (map :total %))))
+    (map-indexed vector))
+   (sort-by count (vals orders-map))))
 
 (def table-keys [:total :email :ship-city :order-date :ship-date])
 
 (defn print-guess
   [n guess]
-  (println "Option" n ":" (:order-id (first guess)) (:order-date (first guess)))
+  (println "Option" (inc n) ":" (:order-id (first guess)) (:order-date (first guess)))
   (pp/print-table table-keys guess)
   (println))
 
 (defn print-guesses
-  [pbm n]
-  (let [amount (bigdec n)]
-    (if-let [guesses (get pbm amount)]
-      (do
-        (println "There are" (count guesses) "possible explanation(s) for $" n ":\n")
-        (doseq [[idx guess] (map-indexed vector guesses)]
-          (print-guess (inc idx) guess)))
-      (println "No amounts matched.\n"))))
+  [orders-map input consider-limit guess-limit]
+  (let [amount (bigdec input)
+        ct (reduce
+            (completing (fn [ct [n guess]]
+                          (print-guess n guess)
+                          (let [nct (inc ct)]
+                            (if (<= guess-limit nct)
+                              (reduced nct)
+                              nct))))
+            0
+            (possible-shipments amount orders-map consider-limit))]
+    (println "Showing" ct "possible explanation(s) for $" amount)))
 
 (defn guesser
   "Launch a REPL UI that lets you enter dollar amounts, guessing
@@ -127,15 +123,13 @@ how the Amazon items report in csv-file might
 account for those dollar amounts."
   [csv-file]
   (let [rows (load-items csv-file)
-        _ (prn "Item Count: " (count rows))
-        orders (bin-by rows :order-id)
-        _ (prn "Order Count: " (count orders))
-        pbm (possible-bill-amounts orders)]
-    (println "For" csv-file "I am considering" (count pbm) "distinct dollar amounts that might show up on a credit card statement.")
+        _ (println "Item Count: " (count rows))
+        order-map (bin-by rows :order-id)
+        _ (println "Order Count: " (count order-map))]
     (loop []
       (println "Enter a USD amount in format n.nn to guess, or :exit to exit")
       (let [step (edn/read *in*)]
         (cond
-         (number? step) (do (print-guesses pbm step) (recur))
+         (number? step) (do (print-guesses order-map step 5000000 10) (recur))
          (= :exit step) :done
          :default (recur))))))
